@@ -1,0 +1,7 @@
+---
+# role: ansible-role-mariadb
+# file: tasks/main.yml
+
+- name: Import tasks for role ansible-role-mariadb
+  import_tasks: tasks.yml
+  when: mariadb_role_enabled | bool

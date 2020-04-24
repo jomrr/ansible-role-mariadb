@@ -1,0 +1,5 @@
+---
+# role: ansible-role-mariadb
+# file: vars/Suse.yml
+
+mariadb_packages: []

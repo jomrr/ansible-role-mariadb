@@ -1,0 +1,50 @@
+---
+# role: ansible-role-mariadb
+# file: molecule/kvm/molecule.yml
+
+dependency:
+  name: galaxy
+  options:
+    role-file: requirements.yml
+driver:
+  name: vagrant
+  provider:
+    name: libvirt
+    type: libvirt
+    options:
+      memory: 2048
+      cpus: 2
+lint: |
+  set -e
+  yamllint .
+  ansible-lint
+  flake8
+platforms:
+  - name: mariadb-arch
+    box: "archlinux/archlinux"
+  - name: mariadb-centos8
+    box: "centos/8"
+  - name: mariadb-debian10
+    box: "debian/buster64"
+  - name: mariadb-fedora31
+    box: "fedora/31-cloud-base"
+  - name: mariadb-ubuntu1804
+    box: "generic/ubuntu1804"
+provisioner:
+  name: ansible
+  log: True
+  playbooks:
+    prepare: ../resources/playbooks/prepare.yml
+    converge: ../resources/playbooks/converge.yml
+  inventory:
+    group_vars:
+      all:
+        mariadb_role_enabled: True
+verifier:
+  name: testinfra
+  env:
+    PYTHONWARNINGS: "ignore"
+  directory: ../resources/tests
+  options:
+    v: True
+    sudo: True

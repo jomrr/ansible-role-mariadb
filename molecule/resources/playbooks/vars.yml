@@ -1,0 +1,6 @@
+---
+# role: ansible-role-mariadb
+# file: molecule/resources/playbooks/vars.yml
+
+common_role_enabled: True
+mariadb_role_enabled: True

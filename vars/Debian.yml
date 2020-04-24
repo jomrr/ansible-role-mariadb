@@ -1,0 +1,5 @@
+---
+# role: ansible-role-mariadb
+# file: vars/Debian.yml
+
+mariadb_packages: []

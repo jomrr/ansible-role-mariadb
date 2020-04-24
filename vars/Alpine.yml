@@ -1,0 +1,5 @@
+---
+# role: ansible-role-mariadb
+# file: vars/Alpine.yml
+
+mariadb_packages: []

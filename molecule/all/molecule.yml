@@ -1,0 +1,236 @@
+---
+# role: ansible-role-mariadb
+# file: molecule/all/molecule.yml
+
+dependency:
+  name: galaxy
+  options:
+    role-file: requirements.yml
+driver:
+  name: docker
+lint: |
+  set -e
+  yamllint .
+  ansible-lint
+  flake8
+platforms:
+  - name: mariadb-alpine311
+    image: "jam82/molecule-alpine:3.11"
+    override_command: False
+    pre_build_image: True
+    privileged: True
+    tmpfs:
+      - /tmp
+      - /run
+  - name: mariadb-alpine
+    image: "jam82/molecule-alpine:latest"
+    override_command: False
+    pre_build_image: True
+    privileged: True
+    tmpfs:
+      - /tmp
+      - /run
+  - name: mariadb-amazonlinux
+    image: "jam82/molecule-amazonlinux:latest"
+    override_command: False
+    pre_build_image: True
+    privileged: True
+    tmpfs:
+      - /tmp
+      - /run
+    volumes:
+      - "/sys/fs/cgroup:/sys/fs/cgroup:ro"
+  - name: mariadb-arch
+    image: "jam82/molecule-archlinux:latest"
+    override_command: False
+    pre_build_image: True
+    privileged: True
+    tmpfs:
+      - /tmp
+      - /run
+    volumes:
+      - "/sys/fs/cgroup:/sys/fs/cgroup:ro"
+  - name: mariadb-centos6
+    image: "jam82/molecule-centos:6"
+    override_command: False
+    pre_build_image: True
+    privileged: True
+    tmpfs:
+      - /tmp
+      - /run
+  - name: mariadb-centos7
+    image: "jam82/molecule-centos:7"
+    override_command: False
+    pre_build_image: True
+    privileged: True
+    tmpfs:
+      - /tmp
+      - /run
+    volumes:
+      - "/sys/fs/cgroup:/sys/fs/cgroup:ro"
+  - name: mariadb-centos8
+    image: "jam82/molecule-centos:8"
+    override_command: False
+    pre_build_image: True
+    privileged: True
+    tmpfs:
+      - /tmp
+      - /run
+    volumes:
+      - "/sys/fs/cgroup:/sys/fs/cgroup:ro"
+  - name: mariadb-debian9
+    image: "jam82/molecule-debian:9"
+    override_command: False
+    pre_build_image: True
+    privileged: True
+    tmpfs:
+      - /tmp
+      - /run
+    volumes:
+      - "/sys/fs/cgroup:/sys/fs/cgroup:ro"
+  - name: mariadb-debian10
+    image: "jam82/molecule-debian:10"
+    override_command: False
+    pre_build_image: True
+    privileged: True
+    tmpfs:
+      - /tmp
+      - /run
+    volumes:
+      - "/sys/fs/cgroup:/sys/fs/cgroup:ro"
+  - name: mariadb-debian
+    image: "jam82/molecule-debian:latest"
+    override_command: False
+    pre_build_image: True
+    privileged: True
+    tmpfs:
+      - /tmp
+      - /run
+    volumes:
+      - "/sys/fs/cgroup:/sys/fs/cgroup:ro"
+  - name: mariadb-opensuse15
+    image: "jam82/molecule-opensuse:15"
+    override_command: False
+    pre_build_image: True
+    privileged: True
+    tmpfs:
+      - /tmp
+      - /run
+    volumes:
+      - "/sys/fs/cgroup:/sys/fs/cgroup:ro"
+  - name: mariadb-opensuse
+    image: "jam82/molecule-opensuse:latest"
+    override_command: False
+    pre_build_image: True
+    privileged: True
+    tmpfs:
+      - /tmp
+      - /run
+    volumes:
+      - "/sys/fs/cgroup:/sys/fs/cgroup:ro"
+  - name: mariadb-opensuse-tumbleweed
+    image: "jam82/molecule-opensuse:tumbleweed"
+    override_command: False
+    pre_build_image: True
+    privileged: True
+    tmpfs:
+      - /tmp
+      - /run
+    volumes:
+      - "/sys/fs/cgroup:/sys/fs/cgroup:ro"
+  - name: mariadb-oraclelinux6
+    image: "jam82/molecule-oraclelinux:6"
+    override_command: False
+    pre_build_image: True
+    privileged: True
+    tmpfs:
+      - /tmp
+      - /run
+  - name: mariadb-oraclelinux7
+    image: "jam82/molecule-oraclelinux:7"
+    override_command: False
+    pre_build_image: True
+    privileged: True
+    tmpfs:
+      - /tmp
+      - /run
+    volumes:
+      - "/sys/fs/cgroup:/sys/fs/cgroup:ro"
+  - name: mariadb-oraclelinux8
+    image: "jam82/molecule-oraclelinux:8"
+    override_command: False
+    pre_build_image: True
+    privileged: True
+    tmpfs:
+      - /tmp
+      - /run
+    volumes:
+      - "/sys/fs/cgroup:/sys/fs/cgroup:ro"
+  - name: mariadb-oraclelinux
+    image: "jam82/molecule-oraclelinux:latest"
+    override_command: False
+    pre_build_image: True
+    privileged: True
+    tmpfs:
+      - /tmp
+      - /run
+    volumes:
+      - "/sys/fs/cgroup:/sys/fs/cgroup:ro"
+  - name: mariadb-ubuntu1604
+    image: "jam82/molecule-ubuntu:16.04"
+    override_command: False
+    pre_build_image: True
+    privileged: True
+    tmpfs:
+      - /tmp
+      - /run
+    volumes:
+      - "/sys/fs/cgroup:/sys/fs/cgroup:ro"
+  - name: mariadb-ubuntu1804
+    image: "jam82/molecule-ubuntu:18.04"
+    override_command: False
+    pre_build_image: True
+    privileged: True
+    tmpfs:
+      - /tmp
+      - /run
+    volumes:
+      - "/sys/fs/cgroup:/sys/fs/cgroup:ro"
+  - name: mariadb-ubuntu2004
+    image: "jam82/molecule-ubuntu:20.04"
+    override_command: False
+    pre_build_image: True
+    privileged: True
+    tmpfs:
+      - /tmp
+      - /run
+    volumes:
+      - "/sys/fs/cgroup:/sys/fs/cgroup:ro"
+  - name: mariadb-ubuntu
+    image: "jam82/molecule-ubuntu:latest"
+    override_command: False
+    pre_build_image: True
+    privileged: True
+    tmpfs:
+      - /tmp
+      - /run
+    volumes:
+      - "/sys/fs/cgroup:/sys/fs/cgroup:ro"
+provisioner:
+  name: ansible
+  log: True
+  playbooks:
+    prepare: ../resources/playbooks/prepare.yml
+    converge: ../resources/playbooks/converge.yml
+  inventory:
+    group_vars:
+      all:
+        mariadb_role_enabled: True
+verifier:
+  name: testinfra
+  env:
+    PYTHONWARNINGS: "ignore"
+  directory: ../resources/tests
+  options:
+    v: True
+    sudo: True

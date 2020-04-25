@@ -2,4 +2,5 @@
 # role: ansible-role-mariadb
 # file: vars/RedHat.yml
 
-mariadb_packages: []
+mariadb_packages:
+  - mariadb-server

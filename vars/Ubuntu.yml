@@ -1,7 +1,7 @@
 ---
 # role: ansible-role-mariadb
-# file: vars/Debian.yml
+# file: vars/Ubuntu.yml
 
 mariadb_packages:
-  - mariadb-client
+  - mariadb-backup
   - mariadb-server

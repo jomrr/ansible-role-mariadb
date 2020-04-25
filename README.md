@@ -1,6 +1,6 @@
 # ansible-role-mariadb
 
-**Ansible role for setting up mariadb.**
+**Ansible role for setting up [MariaDB](https://mariadb.org).**
 
 ## Supported Platforms
 

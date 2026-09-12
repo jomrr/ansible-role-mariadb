@@ -16,16 +16,23 @@ argument_specs:
         default: mariadb
         description:
           - Distribution service enabled and started by the role.
+      mariadb_tcp_enabled:
+        type: bool
+        default: true
+        description:
+          - Enable TCP connections in addition to the distribution Unix socket. False disables
+            all TCP listeners using skip-networking.
       mariadb_bind_address:
         type: str
         default: 127.0.0.1
         description:
-          - Address on which MariaDB accepts TCP connections.
+          - Address on which MariaDB accepts TCP connections; only used when mariadb_tcp_enabled
+            is true.
       mariadb_port:
         type: int
         default: 3306
         description:
-          - TCP port for MariaDB clients.
+          - TCP port for MariaDB clients; only used when mariadb_tcp_enabled is true.
       mariadb_tls_enabled:
         type: bool
         default: false

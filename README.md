@@ -18,7 +18,8 @@ declared application databases and accounts.
 ### Managed
 
 - MariaDB server, client and PyMySQL packages; enabled and running service.
-- A validated server snippet with bind address and TCP port.
+- A validated server snippet with TCP listener control, bind address and port,
+  including Unix-socket-only operation.
 - Optional TLS configuration using existing certificates and an optional
   encrypted TCP transport requirement.
 - Local root socket authentication, anonymous and remote root account removal,
@@ -76,11 +77,25 @@ Default:
 mariadb_service: mariadb
 ```
 
+### `mariadb_tcp_enabled`
+
+Type: `bool`. Required: `false`.
+
+Enable TCP connections in addition to the distribution Unix socket. False
+disables all TCP listeners using skip-networking.
+
+Default:
+
+```yaml
+mariadb_tcp_enabled: true
+```
+
 ### `mariadb_bind_address`
 
 Type: `str`. Required: `false`.
 
-Address on which MariaDB accepts TCP connections.
+Address on which MariaDB accepts TCP connections; only used when
+mariadb_tcp_enabled is true.
 
 Default:
 
@@ -92,7 +107,7 @@ mariadb_bind_address: 127.0.0.1
 
 Type: `int`. Required: `false`.
 
-TCP port for MariaDB clients.
+TCP port for MariaDB clients; only used when mariadb_tcp_enabled is true.
 
 Default:
 
@@ -320,7 +335,8 @@ restart it before database objects are managed.
   prohibited. Protect authentication secrets with Ansible Vault; mariadb_no_log
   defaults to true.
 - TCP listens on 127.0.0.1 by default. Opening access on other addresses
-  requires appropriate network and TLS controls.
+  requires appropriate network and TLS controls. Set mariadb_tcp_enabled to
+  false to disable TCP completely, including loopback connections.
 - Enable mariadb_tls_enabled with mariadb_tls_cert_file and mariadb_tls_key_file
   to use existing PEM files. An optional mariadb_tls_ca_file supplies a CA
   bundle. Clients must verify the server certificate and hostname.
@@ -348,6 +364,11 @@ restart it before database objects are managed.
   mariadbd --defaults-file validation checks the candidate snippet before
   deployment; it does not validate interactions with other administrator-managed
   snippets.
+- mariadb_tcp_enabled controls skip-networking explicitly. When false, the role
+  omits bind-address and port from its snippet; all clients must use the
+  distribution Unix socket. Database and user management remain available
+  through that socket. Set it back to true to restore TCP with
+  mariadb_bind_address and mariadb_port; changes restart MariaDB.
 - Database encoding and collation are creation defaults; existing databases are
   not converted.
 - TLS paths must be absolute and readable by the MariaDB service, including
@@ -435,6 +456,15 @@ mariadb_users:
   - name: application
     password: "{{ vault_mariadb_application_password }}"
     priv: 'application.*:ALL'
+```
+
+### Unix socket only
+
+Accept local Unix socket connections without opening any TCP listener.
+
+```yaml
+---
+mariadb_tcp_enabled: false
 ```
 
 ### Require encrypted TCP connections

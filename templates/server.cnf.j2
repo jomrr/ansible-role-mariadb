@@ -2,8 +2,11 @@
 # file: {{ template_destpath }}
 
 [mysqld]
+skip-networking = {{ mariadb_tcp_enabled | ternary('OFF', 'ON') }}
+{% if mariadb_tcp_enabled %}
 bind-address = {{ mariadb_bind_address }}
 port = {{ mariadb_port }}
+{% endif %}
 {% if mariadb_tls_enabled %}
 ssl = ON
 ssl-cert = {{ mariadb_tls_cert_file | to_json }}

@@ -165,7 +165,7 @@
     - name: MARIADB | Disable plugins and managed TLS settings and change the port and password
       ansible.builtin.include_role:
         name: "{{ lookup('ansible.builtin.env', 'MOLECULE_PROJECT_DIRECTORY') }}"
-      vars:
+      vars: &__mariadb_reconfigured
         mariadb_port: 3308
         mariadb_plugins:
           - {name: server_audit, library: server_audit, enabled: false}
@@ -219,4 +219,40 @@
       ansible.builtin.assert:
         that:
           - __mariadb_disabled_plugins.query_result[0][0].active == 0
+        quiet: true
+
+    - name: MARIADB | Switch the running instance to Unix socket access only
+      ansible.builtin.include_role:
+        name: "{{ lookup('ansible.builtin.env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+      vars:
+        <<: *__mariadb_reconfigured
+        mariadb_tcp_enabled: false
+
+    - name: MARIADB | Verify the former and default TCP ports are closed
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: "{{ __mariadb_probe_port }}"
+        state: stopped
+        connect_timeout: 1
+        timeout: 3
+      loop: [3308, 3306]
+      loop_control:
+        loop_var: __mariadb_probe_port
+        label: "{{ __mariadb_probe_port }}"
+
+    - name: MARIADB | Read application data through the Unix socket with TCP disabled
+      ansible.mariadb.mariadb_query:
+        login_user: application
+        login_password: molecule-rotated-password
+        login_unix_socket: "{{ __mariadb_socket }}"
+        config_file: ''
+        login_db: application
+        query: SELECT id, @@skip_networking AS skip_networking FROM role_probe
+      register: __mariadb_socket_application
+      no_log: true
+
+    - name: MARIADB | Verify application access survives disabling TCP
+      ansible.builtin.assert:
+        that:
+          - __mariadb_socket_application.query_result[0] == [{'id':42, 'skip_networking':1}]
         quiet: true

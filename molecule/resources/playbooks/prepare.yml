@@ -49,16 +49,25 @@
         update_cache: true
       when: ansible_facts.os_family == 'Debian'
 
-    - name: MARIADB | Install the default instance
+    - name: MARIADB | Install the instance with Unix socket access only
       ansible.builtin.include_role:
         name: "{{ lookup('ansible.builtin.env', 'MOLECULE_PROJECT_DIRECTORY') }}"
         public: true
       vars:
+        mariadb_tcp_enabled: false
         mariadb_tls_enabled: false
         mariadb_require_secure_transport: false
         mariadb_plugins: []
         mariadb_databases: []
         mariadb_users: []
+
+    - name: MARIADB | Verify TCP is disabled on the initial installation
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: 3307
+        state: stopped
+        connect_timeout: 1
+        timeout: 3
 
     - name: MARIADB | Seed databases for hardening and explicit removal
       become: true

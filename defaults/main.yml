@@ -5,10 +5,14 @@
 # Distribution service managing the MariaDB instance.
 mariadb_service: mariadb
 
-# Address on which the server accepts TCP connections.
+# Enable TCP in addition to the distribution Unix socket; false disables every TCP listener.
+mariadb_tcp_enabled: true
+# mariadb_tcp_enabled: false
+
+# Address on which the server accepts connections when TCP is enabled.
 mariadb_bind_address: 127.0.0.1
 
-# TCP port for MariaDB clients.
+# Port for MariaDB clients when TCP is enabled.
 mariadb_port: 3306
 
 # Configure existing TLS credentials; false leaves distribution TLS settings in effect.

@@ -1,7 +1,0 @@
----
-# role: ansible-role-mariadb
-# file: vars/Ubuntu.yml
-
-mariadb_packages:
-  - mariadb-backup
-  - mariadb-server

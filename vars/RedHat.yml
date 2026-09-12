@@ -1,6 +1,11 @@
 ---
-# role: ansible-role-mariadb
+# role: mariadb
 # file: vars/RedHat.yml
 
-mariadb_packages:
+__mariadb_packages:
   - mariadb-server
+  - mariadb
+  - python3-PyMySQL
+__mariadb_config_file: /etc/my.cnf.d/99-ansible.cnf
+__mariadb_socket: /var/lib/mysql/mysql.sock
+__mariadb_validate_config: /usr/libexec/mariadbd --defaults-file=%s --verbose --help

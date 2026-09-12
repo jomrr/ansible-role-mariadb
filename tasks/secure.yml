@@ -1,0 +1,70 @@
+---
+# role: mariadb
+# file: tasks/secure.yml
+
+- name: MARIADB | Authenticate local root through the Unix socket
+  become: true
+  become_user: root
+  ansible.mariadb.mariadb_user:
+    name: root
+    host: localhost
+    plugin: unix_socket
+    state: present
+
+- name: MARIADB | Remove alternative root authentication methods
+  become: true
+  become_user: root
+  ansible.mariadb.mariadb_query:
+    query: >-
+      UPDATE mysql.global_priv SET Priv = JSON_REMOVE(Priv, '$.auth_or')
+      WHERE User = 'root' AND Host = 'localhost'
+      AND JSON_CONTAINS_PATH(Priv, 'one', '$.auth_or') = 1
+  notify: reload privileges
+
+- name: MARIADB | Remove anonymous accounts on every host
+  become: true
+  become_user: root
+  ansible.mariadb.mariadb_user:
+    name: ''
+    host_all: true
+    state: absent
+
+- name: MARIADB | Find root accounts outside localhost
+  become: true
+  become_user: root
+  ansible.mariadb.mariadb_query:
+    query: SELECT Host FROM mysql.user WHERE User = 'root' AND Host <> 'localhost'
+  check_mode: false
+  register: __mariadb_remote_root
+
+- name: MARIADB | Remove root accounts outside localhost
+  become: true
+  become_user: root
+  ansible.mariadb.mariadb_user:
+    name: root
+    host: "{{ __mariadb_root.Host }}"
+    state: absent
+  loop: "{{ __mariadb_remote_root.query_result[0] }}"
+  loop_control:
+    loop_var: __mariadb_root
+    label: "{{ __mariadb_root.Host }}"
+
+- name: MARIADB | Remove the test database
+  become: true
+  become_user: root
+  ansible.mariadb.mariadb_db:
+    name: test
+    state: absent
+
+- name: MARIADB | Remove grants for test databases
+  become: true
+  become_user: root
+  ansible.mariadb.mariadb_query:
+    query: DELETE FROM mysql.db WHERE Db IN (%s, %s)
+    positional_args:
+      - test
+      - 'test\_%'
+  notify: reload privileges
+
+- name: MARIADB | Apply grant table changes before managing application accounts
+  ansible.builtin.meta: flush_handlers

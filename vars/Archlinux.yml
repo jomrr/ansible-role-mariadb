@@ -1,7 +1,0 @@
----
-# role: ansible-role-mariadb
-# file: vars/Archlinux.yml
-
-mariadb_packages:
-  - mariadb
-  - mariadb-clients

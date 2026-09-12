@@ -1,15 +1,9 @@
 ---
-# role: ansible-role-mariadb
+# role: mariadb
 # file: molecule/resources/playbooks/converge.yml
 
-- name: Converge
+- name: "Molecule | converge | mariadb"
   hosts: all
-  become: True
-  pre_tasks:
-    - name: "Include variables to converge playbook"
-      include_vars: vars.yml
+  gather_facts: true
   roles:
-    # if you want to enable requirements put them in requirements.yml
-    # and add here
-    # - role: common
-    - role: ansible-role-mariadb
+    - role: "{{ lookup('ansible.builtin.env', 'MOLECULE_PROJECT_DIRECTORY') }}"

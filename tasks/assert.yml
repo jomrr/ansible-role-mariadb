@@ -1,0 +1,27 @@
+---
+# role: mariadb
+# file: tasks/assert.yml
+
+- name: MARIADB | Reserve system and test databases
+  ansible.builtin.assert:
+    that:
+      - __mariadb_database.name | lower not in ['mysql', 'sys', 'information_schema', 'performance_schema', 'test']
+    fail_msg: System databases and the test database are reserved.
+    quiet: true
+  loop: "{{ mariadb_databases }}"
+  loop_control:
+    loop_var: __mariadb_database
+    label: "{{ __mariadb_database.name }}"
+
+- name: MARIADB | Require named application accounts with passwords
+  ansible.builtin.assert:
+    that:
+      - __mariadb_user.name | lower not in ['', 'root', 'mysql', 'mariadb.sys']
+      - __mariadb_user.state | default('present') == 'absent' or (__mariadb_user.password | default('') | length > 0)
+    fail_msg: Application accounts require a nonempty password when present; administrative and anonymous accounts are reserved.
+    quiet: true
+  loop: "{{ mariadb_users }}"
+  loop_control:
+    loop_var: __mariadb_user
+    label: "{{ __mariadb_user.name }}"
+  no_log: "{{ mariadb_no_log }}"

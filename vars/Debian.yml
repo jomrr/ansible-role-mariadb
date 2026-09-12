@@ -1,7 +1,11 @@
 ---
-# role: ansible-role-mariadb
+# role: mariadb
 # file: vars/Debian.yml
 
-mariadb_packages:
-  - mariadb-client
+__mariadb_packages:
   - mariadb-server
+  - mariadb-client
+  - python3-pymysql
+__mariadb_config_file: /etc/mysql/mariadb.conf.d/99-ansible.cnf
+__mariadb_socket: /run/mysqld/mysqld.sock
+__mariadb_validate_config: /usr/sbin/mariadbd --defaults-file=%s --verbose --help

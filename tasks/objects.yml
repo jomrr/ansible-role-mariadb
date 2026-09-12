@@ -1,0 +1,33 @@
+---
+# role: mariadb
+# file: tasks/objects.yml
+
+- name: MARIADB | Manage application databases
+  become: true
+  become_user: root
+  ansible.mariadb.mariadb_db:
+    name: "{{ __mariadb_database.name }}"
+    state: "{{ __mariadb_database.state | default('present') }}"
+    encoding: "{{ __mariadb_database.encoding | default(mariadb_database_encoding) }}"
+    collation: "{{ __mariadb_database.collation | default(mariadb_database_collation) }}"
+  loop: "{{ mariadb_databases }}"
+  loop_control:
+    loop_var: __mariadb_database
+    label: "{{ __mariadb_database.name }}"
+
+- name: MARIADB | Manage application accounts and privileges
+  become: true
+  become_user: root
+  ansible.mariadb.mariadb_user:
+    name: "{{ __mariadb_user.name }}"
+    host: "{{ __mariadb_user.host | default(mariadb_user_host) }}"
+    password: "{{ __mariadb_user.password | default(omit) }}"
+    priv: "{{ __mariadb_user.priv | default(omit) }}"
+    state: "{{ __mariadb_user.state | default('present') }}"
+    update_password: "{{ __mariadb_user.update_password | default(mariadb_user_update_password) }}"
+    append_privs: "{{ __mariadb_user.append_privs | default(mariadb_user_append_privs) }}"
+  loop: "{{ mariadb_users }}"
+  loop_control:
+    loop_var: __mariadb_user
+    label: "{{ __mariadb_user.name }}@{{ __mariadb_user.host | default(mariadb_user_host) }}"
+  no_log: "{{ mariadb_no_log }}"

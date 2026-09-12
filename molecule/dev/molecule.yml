@@ -1,6 +1,6 @@
 ---
 # role: mariadb
-# file: molecule/default/molecule.yml
+# file: molecule/dev/molecule.yml
 
 dependency:
   name: "galaxy"
@@ -58,10 +58,60 @@ scenario:
     - "check"
     - "verify"
     - "destroy"
-  name: "default"
+  name: "dev"
 platforms:
-  - name: "mariadb"
-    image: "docker.io/${uns:-jomrr}/molecule-${img:-fedora}:${tag:-latest}"
+  - name: "almalinux-latest-mariadb"
+    image: "docker.io/jomrr/molecule-almalinux:latest"
+    pre_build_image: true
+    override_command: false
+    systemd: "true"
+    capabilities:
+      - "SYS_ADMIN"
+      - "IPC_LOCK"
+    security_opts:
+      - "label=disable"
+  - name: "debian-latest-mariadb"
+    image: "docker.io/jomrr/molecule-debian:latest"
+    pre_build_image: true
+    override_command: false
+    systemd: "true"
+    capabilities:
+      - "SYS_ADMIN"
+      - "IPC_LOCK"
+    security_opts:
+      - "label=disable"
+  - name: "fedora-latest-mariadb"
+    image: "docker.io/jomrr/molecule-fedora:latest"
+    pre_build_image: true
+    override_command: false
+    systemd: "true"
+    capabilities:
+      - "SYS_ADMIN"
+      - "IPC_LOCK"
+    security_opts:
+      - "label=disable"
+  - name: "opensuse-leap-latest-mariadb"
+    image: "docker.io/jomrr/molecule-opensuse-leap:latest"
+    pre_build_image: true
+    override_command: false
+    systemd: "true"
+    capabilities:
+      - "SYS_ADMIN"
+      - "IPC_LOCK"
+    security_opts:
+      - "label=disable"
+  - name: "opensuse-tumbleweed-latest-mariadb"
+    image: "docker.io/jomrr/molecule-opensuse-tumbleweed:latest"
+    pre_build_image: true
+    override_command: false
+    systemd: "true"
+    capabilities:
+      - "SYS_ADMIN"
+      - "IPC_LOCK"
+    security_opts:
+      - "label=disable"
+  - name: "ubuntu-latest-mariadb"
+    image: "docker.io/jomrr/molecule-ubuntu:latest"
     pre_build_image: true
     override_command: false
     systemd: "true"

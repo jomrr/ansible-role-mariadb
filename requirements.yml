@@ -1,8 +1,0 @@
----
-# role: jomrr.mariadb
-# file: meta/requirements.yml
-
-collections:
-  - {'name': 'community.general'}
-
-roles: []

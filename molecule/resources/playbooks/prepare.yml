@@ -1,98 +1,77 @@
 ---
-# role: ansible-role-mariadb
+# role: mariadb
 # file: molecule/resources/playbooks/prepare.yml
 
-- name: Prepare
+- name: MARIADB | Prepare installation and insecure legacy fixtures
   hosts: all
-  become: True
-  gather_facts: False
-  vars:
-    epel_enabled: True
-    upgrade_enabled: False
+  gather_facts: true
   tasks:
-    # this is done to save time, just fire all commands
-    - name: Set fact for os-specific bootstrapping
-      set_fact:
-        bootstrap:
-          - 'apk add --no-cache bash sudo python3 vim'
-          - 'apt-get -y update && apt-get install -y bash sudo python3 python3-apt vim'
-          - 'dnf makecache && dnf -y install bash sudo python3 vim'
-          - 'pacman -Syy && pacman --noconfirm -S bash sudo python3 vim'
-          - 'yum -y makecache && yum -y install bash sudo python3 vim'
-          - 'zypper -n update && zypper -n install bash sudo python python-xml python3 python3-xml vim'
+    - name: MARIADB | Refresh Debian package metadata from cached test images
+      become: true
+      become_user: root
+      ansible.builtin.apt:
+        update_cache: true
+      when: ansible_facts.os_family == 'Debian'
 
-    # bootstrap machines for ansible with bash, sudo, python and vim
-    - name: Bootstrap machine for ansible (ignore_errors)
-      raw: "{{ item }}"
-      loop: "{{ bootstrap }}"
-      ignore_errors: yes
-      tags: ['skip_ansible_lint']
+    - name: MARIADB | Install the default instance
+      ansible.builtin.include_role:
+        name: "{{ lookup('ansible.builtin.env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+        public: true
+      vars:
+        mariadb_databases: []
+        mariadb_users: []
 
-    # gather facts
-    - name: Gather facts
-      gather_facts:
+    - name: MARIADB | Seed databases for hardening and explicit removal
+      become: true
+      become_user: root
+      ansible.mariadb.mariadb_db:
+        login_user: root
+        login_unix_socket: "{{ __mariadb_socket }}"
+        config_file: ''
+        name: [test, obsolete]
+        state: present
 
-    - name: Enable EPEL Repository
-      block:
-        - name: EPEL 7 and earlier
-          yum:
-            name: 'epel-release'
-            state: present
-            update_cache: yes
-          when: ansible_distribution_major_version <= '7'
-        - name: EPEL 8 and later
-          dnf:
-            name: 'epel-release'
-            state: present
-            update_cache: yes
-          when: ansible_distribution_major_version >= '8'
-      when: ansible_distribution == 'CentOS'
-        or ansible_distribution == "RedHat"
-        and epel_enabled | bool
+    - name: MARIADB | Seed insecure and obsolete accounts
+      become: true
+      become_user: root
+      ansible.mariadb.mariadb_user:
+        login_user: root
+        login_unix_socket: "{{ __mariadb_socket }}"
+        config_file: ''
+        name: "{{ __mariadb_fixture.name }}"
+        host: "{{ __mariadb_fixture.host }}"
+        state: present
+      loop:
+        - {name: root, host: '192.0.2.10'}
+        - {name: '', host: localhost}
+        - {name: '', host: '%'}
+        - {name: obsolete, host: localhost}
+      loop_control:
+        loop_var: __mariadb_fixture
+        label: "{{ __mariadb_fixture.name }}@{{ __mariadb_fixture.host }}"
 
-    - name: Upgrade all packages
-      block:
-        - name: Upgrade all packages (apk)
-          apk:
-            available: yes
-            update_cache: yes
-            upgrade: yes
-          when: ansible_pkg_mgr == 'apk'
+    - name: MARIADB | Seed anonymous test wildcard grants
+      become: true
+      become_user: root
+      ansible.mariadb.mariadb_query:
+        login_user: root
+        login_unix_socket: "{{ __mariadb_socket }}"
+        config_file: ''
+        query: >-
+          INSERT INTO mysql.db (Host, Db, User, Select_priv)
+          VALUES ('%%', %s, '', 'Y')
+          ON DUPLICATE KEY UPDATE Select_priv = 'Y'
+        positional_args:
+          - 'test\_%'
 
-        - name: Upgrade all packages (apt)
-          apt:
-            upgrade: dist
-            update_cache: yes
-            autoremove: yes
-          when: ansible_pkg_mgr == 'apt'
-
-        - name: Upgrade all packages (dnf)
-          dnf:
-            name: '*'
-            state: latest
-            update_cache: yes
-          when: ansible_pkg_mgr == "dnf"
-          tags: ['skip_ansible_lint']
-
-        - name: Upgrade all packages (pacman)
-          pacman:
-            update_cache: yes
-            upgrade: yes
-          when: ansible_pkg_mgr == 'pacman'
-
-        - name: Upgrade all packages (yum)
-          yum:
-            name: '*'
-            state: latest
-            update_cache: yes
-          when: ansible_pkg_mgr == 'yum'
-          tags: ['skip_ansible_lint']
-
-        - name: Upgrade all packages (zypper)
-          zypper:
-            name: '*'
-            state: latest
-            update_cache: yes
-          when: ansible_pkg_mgr == 'zypper'
-          tags: ['skip_ansible_lint']
-      when: upgrade_enabled | bool
+    - name: MARIADB | Seed alternative root password authentication
+      become: true
+      become_user: root
+      ansible.mariadb.mariadb_query:
+        login_user: root
+        login_unix_socket: "{{ __mariadb_socket }}"
+        config_file: ''
+        query: >-
+          ALTER USER 'root'@'localhost' IDENTIFIED VIA unix_socket
+          OR mysql_native_password USING PASSWORD('molecule-legacy-root')
+      no_log: true

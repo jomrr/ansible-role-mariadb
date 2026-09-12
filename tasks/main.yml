@@ -1,7 +1,33 @@
 ---
-# role: ansible-role-mariadb
+# role: mariadb
 # file: tasks/main.yml
 
-- name: Import tasks for role ansible-role-mariadb
-  import_tasks: tasks.yml
-  when: mariadb_role_enabled | bool
+- name: MARIADB | Load distribution settings
+  ansible.builtin.include_vars: "{{ lookup('ansible.builtin.first_found', __mariadb_platform_files) }}"
+  vars:
+    __mariadb_platform_files:
+      files:
+        - "{{ ansible_facts.distribution }}-{{ ansible_facts.distribution_major_version }}.yml"
+        - "{{ ansible_facts.distribution }}.yml"
+        - "{{ ansible_facts.os_family }}.yml"
+      paths:
+        - "{{ role_path }}/vars"
+
+- name: MARIADB | Validate application objects
+  ansible.builtin.import_tasks: assert.yml
+
+- name: MARIADB | Install and configure the server
+  ansible.builtin.import_tasks: configure.yml
+
+- name: MARIADB | Manage database state through local socket authentication
+  module_defaults:
+    group/ansible.mariadb.all:
+      login_user: root
+      login_unix_socket: "{{ __mariadb_socket }}"
+      config_file: ''
+  block:
+    - name: MARIADB | Secure the installation
+      ansible.builtin.import_tasks: secure.yml
+
+    - name: MARIADB | Manage application databases and accounts
+      ansible.builtin.import_tasks: objects.yml

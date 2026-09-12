@@ -1,0 +1,34 @@
+---
+# role: mariadb
+# file: tasks/configure.yml
+
+- name: MARIADB | Install server and module dependencies
+  become: true
+  become_user: root
+  ansible.builtin.package:
+    name: "{{ __mariadb_packages }}"
+    state: present
+
+- name: MARIADB | Configure the server
+  become: true
+  become_user: root
+  ansible.builtin.template:
+    src: server.cnf.j2
+    dest: "{{ __mariadb_config_file }}"
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+    validate: "{{ __mariadb_validate_config }}"
+  notify: restart mariadb
+
+- name: MARIADB | Enable and start the server
+  become: true
+  become_user: root
+  ansible.builtin.service:
+    name: "{{ mariadb_service }}"
+    enabled: true
+    state: started
+
+- name: MARIADB | Apply configuration before managing database objects
+  ansible.builtin.meta: flush_handlers

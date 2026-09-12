@@ -1,0 +1,137 @@
+---
+# role: mariadb
+# file: meta/argument_specs.yml
+
+argument_specs:
+  main:
+    short_description: Install and secure MariaDB.
+    description:
+      - Installs and starts the distribution MariaDB service with local socket administration.
+      - Removes anonymous and remote root accounts, alternative root authentication, the
+        test database and test grants.
+      - Manages declared application databases, passwords and privileges.
+    options:
+      mariadb_service:
+        type: str
+        default: mariadb
+        description:
+          - Distribution service enabled and started by the role.
+      mariadb_bind_address:
+        type: str
+        default: 127.0.0.1
+        description:
+          - Address on which MariaDB accepts TCP connections.
+      mariadb_port:
+        type: int
+        default: 3306
+        description:
+          - TCP port for MariaDB clients.
+      mariadb_database_encoding:
+        type: str
+        default: utf8mb4
+        description:
+          - Character set for new databases without an item override.
+      mariadb_database_collation:
+        type: str
+        default: utf8mb4_unicode_ci
+        description:
+          - Collation for new databases without an item override.
+      mariadb_databases:
+        type: list
+        default: []
+        description:
+          - Application databases to create or remove; system databases and test are reserved.
+        elements: dict
+        options:
+          name:
+            type: str
+            required: true
+            description:
+              - Database name.
+          state:
+            type: str
+            default: present
+            choices:
+              - present
+              - absent
+            description:
+              - Desired database state.
+          encoding:
+            type: str
+            description:
+              - Creation character set; defaults to mariadb_database_encoding.
+          collation:
+            type: str
+            description:
+              - Creation collation; defaults to mariadb_database_collation.
+      mariadb_user_host:
+        type: str
+        default: localhost
+        description:
+          - Default host component of application accounts.
+      mariadb_user_update_password:
+        type: str
+        default: always
+        description:
+          - Password update policy for accounts without an item override.
+        choices:
+          - always
+          - on_create
+          - on_new_username
+      mariadb_user_append_privs:
+        type: bool
+        default: false
+        description:
+          - Extend existing grants instead of replacing them when true.
+      mariadb_users:
+        type: list
+        default: []
+        description:
+          - Application accounts to manage; present accounts require nonempty passwords.
+            Root, mysql, mariadb.sys and anonymous accounts are reserved.
+        elements: dict
+        options:
+          name:
+            type: str
+            required: true
+            description:
+              - Application account name.
+          host:
+            type: str
+            description:
+              - Host component; defaults to mariadb_user_host.
+          password:
+            type: str
+            description:
+              - Plaintext password, required and nonempty for present accounts. Store with
+                Ansible Vault.
+          priv:
+            type: raw
+            description:
+              - Privileges in module string or dictionary format. Omission preserves existing
+                grants; new accounts have USAGE only.
+          state:
+            type: str
+            default: present
+            choices:
+              - present
+              - absent
+            description:
+              - Desired account state.
+          update_password:
+            type: str
+            choices:
+              - always
+              - on_create
+              - on_new_username
+            description:
+              - Password policy; defaults to mariadb_user_update_password.
+          append_privs:
+            type: bool
+            description:
+              - Grant policy; defaults to mariadb_user_append_privs.
+      mariadb_no_log:
+        type: bool
+        default: true
+        description:
+          - Suppress output containing application account passwords.

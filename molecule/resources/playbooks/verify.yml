@@ -1,0 +1,110 @@
+---
+# role: mariadb
+# file: molecule/resources/playbooks/verify.yml
+
+- name: MARIADB | Verify hardening and application access
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: MARIADB | Read account and database state through local root authentication
+      become: true
+      become_user: root
+      ansible.mariadb.mariadb_query:
+        login_user: root
+        config_file: ''
+        login_unix_socket: "{{ __mariadb_verify_sockets[ansible_facts.os_family] }}"
+        query:
+          - SELECT User, Host, plugin FROM mysql.user WHERE User IN ('', 'root', 'obsolete')
+          - SELECT COUNT(*) AS remaining FROM mysql.db WHERE Db IN ('test', 'test\\_%')
+          - SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME IN ('test', 'obsolete')
+          - SELECT JSON_CONTAINS_PATH(Priv, 'one', '$.auth_or') AS alternatives FROM mysql.global_priv WHERE User = 'root' AND Host = 'localhost'
+          - SELECT @@port AS port, @@bind_address AS bind_address
+          - >-
+            SELECT DEFAULT_CHARACTER_SET_NAME AS encoding, DEFAULT_COLLATION_NAME AS collation
+            FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = 'application'
+      vars:
+        __mariadb_verify_sockets:
+          Debian: /run/mysqld/mysqld.sock
+          RedHat: /var/lib/mysql/mysql.sock
+          Suse: /run/mysql/mysql.sock
+      register: __mariadb_state
+
+    - name: MARIADB | Verify secure installation and configured database defaults
+      ansible.builtin.assert:
+        that:
+          - __mariadb_state.query_result[0] == [{'User':'root', 'Host':'localhost', 'plugin':'unix_socket'}]
+          - __mariadb_state.query_result[1][0].remaining == 0
+          - __mariadb_state.query_result[2] == []
+          - __mariadb_state.query_result[3][0].alternatives == 0
+          - __mariadb_state.query_result[4][0].port == 3307
+          - __mariadb_state.query_result[4][0].bind_address == '127.0.0.1'
+          - __mariadb_state.query_result[5][0].encoding == 'utf8mb4'
+          - __mariadb_state.query_result[5][0].collation == 'utf8mb4_unicode_ci'
+        quiet: true
+
+    - name: MARIADB | Exercise application login and write privileges over TCP
+      ansible.mariadb.mariadb_query:
+        login_user: application
+        login_password: molecule-application-password
+        login_host: 127.0.0.1
+        login_port: 3307
+        config_file: ''
+        login_db: application
+        query:
+          - CREATE TABLE IF NOT EXISTS role_probe (id INTEGER PRIMARY KEY)
+          - INSERT INTO role_probe VALUES (42) ON DUPLICATE KEY UPDATE id = 42
+          - SELECT id FROM role_probe
+      register: __mariadb_application
+      no_log: true
+
+    - name: MARIADB | Verify application data access
+      ansible.builtin.assert:
+        that:
+          - __mariadb_application.query_result[2] == [{'id':42}]
+        quiet: true
+
+    - name: MARIADB | Read application data with a restricted account
+      ansible.mariadb.mariadb_query:
+        login_user: reader
+        login_password: molecule-reader-password
+        login_host: 127.0.0.1
+        login_port: 3307
+        config_file: ''
+        login_db: application
+        query: SELECT id FROM role_probe
+      register: __mariadb_reader
+      no_log: true
+
+    - name: MARIADB | Verify the restricted account can read application data
+      ansible.builtin.assert:
+        that:
+          - __mariadb_reader.query_result[0] == [{'id':42}]
+        quiet: true
+
+    - name: MARIADB | Change the running server port and rotate an account password
+      ansible.builtin.include_role:
+        name: "{{ lookup('ansible.builtin.env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+      vars:
+        mariadb_port: 3308
+        mariadb_users:
+          - name: application
+            password: molecule-rotated-password
+            priv: 'application.*:ALL'
+
+    - name: MARIADB | Verify the changed port and password preserve application data
+      ansible.mariadb.mariadb_query:
+        login_user: application
+        login_password: molecule-rotated-password
+        login_host: 127.0.0.1
+        login_port: 3308
+        config_file: ''
+        login_db: application
+        query: SELECT id FROM role_probe
+      register: __mariadb_rotated
+      no_log: true
+
+    - name: MARIADB | Verify data survived the configuration change
+      ansible.builtin.assert:
+        that:
+          - __mariadb_rotated.query_result[0] == [{'id':42}]
+        quiet: true

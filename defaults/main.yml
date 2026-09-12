@@ -28,6 +28,25 @@ mariadb_tls_ca_file: ''
 # False leaves the distribution transport policy in effect.
 mariadb_require_secure_transport: false
 
+# Server plugins, loaded from distribution plugin directories with native options.
+mariadb_plugins: []
+# mariadb_plugins:
+#   - name: server_audit
+#     library: server_audit
+#     options:
+#       server_audit_logging: 'ON'
+#       server_audit_output_type: SYSLOG
+#       server_audit_events: CONNECT,QUERY_DDL,QUERY_DML
+#   - name: gssapi
+#     library: auth_gssapi
+#     options:
+#       gssapi_keytab_path: /etc/mysql/mariadb.keytab
+#       gssapi_principal_name: mariadb/db.example.com@EXAMPLE.COM
+#   - name: pam
+#     library: auth_pam
+#     options:
+#       pam_use_cleartext_plugin: 'ON'
+
 # Character set used when creating databases without an item override.
 mariadb_database_encoding: utf8mb4
 
@@ -44,18 +63,29 @@ mariadb_databases: []
 # Default host component of managed application accounts.
 mariadb_user_host: localhost
 
+# Authentication plugin for managed accounts without an item override.
+mariadb_user_plugin: mysql_native_password
+
 # Password update policy for managed application accounts.
 mariadb_user_update_password: always
 
 # Whether declared privileges extend existing grants instead of replacing them.
 mariadb_user_append_privs: false
 
-# Application accounts with passwords and database privileges.
+# Application accounts with database or external authentication and privileges.
 mariadb_users: []
 # mariadb_users:
 #   - name: application
 #     password: "{{ vault_mariadb_application_password }}"
 #     priv: "application.*:ALL"
+#   - name: kerberos_application
+#     plugin: gssapi
+#     plugin_hash_string: application@EXAMPLE.COM
+#     priv: "application.*:SELECT"
+#   - name: pam_application
+#     plugin: pam
+#     plugin_auth_string: mysql
+#     priv: "application.*:SELECT"
 #   - name: obsolete
 #     state: absent
 

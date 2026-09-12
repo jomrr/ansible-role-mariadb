@@ -35,6 +35,23 @@ provisioner:
         mariadb_tls_key_file: "/etc/mariadb-tls/server.key"
         mariadb_tls_ca_file: "/etc/mariadb-tls/server.crt"
         mariadb_require_secure_transport: true
+        mariadb_plugins:
+          - name: "server_audit"
+            library: "server_audit"
+            options:
+              server_audit_logging: "ON"
+              server_audit_events: "CONNECT,QUERY"
+              server_audit_output_type: "FILE"
+              server_audit_file_path: "molecule-audit.log"
+          - name: "gssapi"
+            library: "auth_gssapi"
+            options:
+              gssapi_keytab_path: "/etc/mariadb-auth/server.keytab"
+              gssapi_principal_name: "mariadb/localhost@MOLECULE.TEST"
+          - name: "pam"
+            library: "auth_pam"
+            options:
+              pam_use_cleartext_plugin: "ON"
         mariadb_databases:
           - name: "application"
           - name: "obsolete"
@@ -47,6 +64,14 @@ provisioner:
             password: "molecule-reader-password"
             priv:
               application.*: "SELECT"
+          - name: "kerberos_application"
+            plugin: "gssapi"
+            plugin_hash_string: "application@MOLECULE.TEST"
+            priv: "application.*:SELECT"
+          - name: "pam_application"
+            plugin: "pam"
+            plugin_auth_string: "mysql"
+            priv: "application.*:SELECT"
           - name: "obsolete"
             state: "absent"
 verifier:

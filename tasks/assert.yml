@@ -29,12 +29,22 @@
     loop_var: __mariadb_database
     label: "{{ __mariadb_database.name }}"
 
-- name: MARIADB | Require named application accounts with passwords
+- name: MARIADB | Require consistent application authentication
   ansible.builtin.assert:
     that:
       - __mariadb_user.name | lower not in ['', 'root', 'mysql', 'mariadb.sys']
-      - __mariadb_user.state | default('present') == 'absent' or (__mariadb_user.password | default('') | length > 0)
-    fail_msg: Application accounts require a nonempty password when present; administrative and anonymous accounts are reserved.
+      - >-
+        __mariadb_user.state | default('present') == 'absent' or
+        __mariadb_user.plugin | default(mariadb_user_plugin) != 'mysql_native_password' or
+        __mariadb_user.password | default('') | length > 0
+      - __mariadb_user.password is not defined or __mariadb_user.plugin | default(mariadb_user_plugin) == 'mysql_native_password'
+      - __mariadb_user.plugin_auth_string is not defined or __mariadb_user.plugin_hash_string is not defined
+      - >-
+        __mariadb_user.password is not defined or
+        (__mariadb_user.plugin_auth_string is not defined and __mariadb_user.plugin_hash_string is not defined)
+    fail_msg: >-
+      Application accounts must not use reserved names. Present mysql_native_password accounts require a nonempty password;
+      other plugins must omit password. Specify at most one password, plugin_auth_string or plugin_hash_string.
     quiet: true
   loop: "{{ mariadb_users }}"
   loop_control:

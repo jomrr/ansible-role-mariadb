@@ -56,6 +56,7 @@
       vars:
         mariadb_tls_enabled: false
         mariadb_require_secure_transport: false
+        mariadb_plugins: []
         mariadb_databases: []
         mariadb_users: []
 
@@ -144,3 +145,59 @@
         group: mysql
         mode: '0640'
       no_log: true
+
+    - name: MARIADB | Install the native test keytab utility
+      become: true
+      become_user: root
+      ansible.builtin.package:
+        name: "{{ __mariadb_test_packages[ansible_facts.os_family] }}"
+        state: present
+      vars:
+        __mariadb_test_packages:
+          Debian: krb5-user
+          RedHat: krb5-workstation
+          Suse: krb5-client
+
+    - name: MARIADB | Create the authentication fixture directory
+      become: true
+      become_user: root
+      ansible.builtin.file:
+        path: /etc/mariadb-auth
+        state: directory
+        owner: root
+        group: mysql
+        mode: '0750'
+
+    - name: MARIADB | Generate a disposable acceptor keytab
+      become: true
+      become_user: root
+      ansible.builtin.command:
+        argv: [ktutil]
+        stdin: |-
+          addent -password -p mariadb/localhost@MOLECULE.TEST -k 1 -e aes256-cts-hmac-sha1-96
+          molecule-keytab-password
+          wkt /etc/mariadb-auth/server.keytab
+          quit
+        creates: /etc/mariadb-auth/server.keytab
+      no_log: true
+
+    - name: MARIADB | Permit the server to read its fixture keytab
+      become: true
+      become_user: root
+      ansible.builtin.file:
+        path: /etc/mariadb-auth/server.keytab
+        owner: root
+        group: mysql
+        mode: '0640'
+
+    - name: MARIADB | Provide a permissive PAM service only inside the test container
+      become: true
+      become_user: root
+      ansible.builtin.copy:
+        dest: /etc/pam.d/mysql
+        content: |
+          auth required pam_permit.so
+          account required pam_permit.so
+        owner: root
+        group: root
+        mode: '0644'

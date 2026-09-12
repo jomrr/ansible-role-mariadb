@@ -25,6 +25,10 @@ declared application databases and accounts.
   test database and test grant removal.
 - Application database and account present/absent states, passwords and
   privileges.
+- Startup plugin loading and native options, including Audit, GSSAPI and PAM,
+  with distribution package defaults.
+- Authentication plugin selection and native authentication strings for managed
+  application accounts.
 
 ### Not Managed
 
@@ -33,6 +37,8 @@ declared application databases and accounts.
 - Data directory migration, distribution configuration replacement or
   password-based root administration.
 - Undeclared application databases and accounts.
+- Kerberos realms, KDCs, keytab provisioning, PAM service policy and audit log
+  directories or retention outside plugin settings.
 
 ## Requirements
 
@@ -160,6 +166,21 @@ Default:
 mariadb_database_encoding: utf8mb4
 ```
 
+### `mariadb_plugins`
+
+Type: `list`. Required: `false`.
+
+Server plugins loaded from distribution plugin directories on startup. Enabled
+plugins must initialize successfully.
+Audit, GSSAPI and PAM use distribution package defaults; other plugins may
+supply their packages explicitly.
+
+Default:
+
+```yaml
+mariadb_plugins: []
+```
+
 ### `mariadb_database_collation`
 
 Type: `str`. Required: `false`.
@@ -197,6 +218,19 @@ Default:
 mariadb_user_host: localhost
 ```
 
+### `mariadb_user_plugin`
+
+Type: `str`. Required: `false`.
+
+Authentication plugin for accounts without an item override. The default
+requires a nonempty database password.
+
+Default:
+
+```yaml
+mariadb_user_plugin: mysql_native_password
+```
+
 ### `mariadb_user_update_password`
 
 Type: `str`. Required: `false`.
@@ -225,8 +259,10 @@ mariadb_user_append_privs: false
 
 Type: `list`. Required: `false`.
 
-Application accounts to manage; present accounts require nonempty passwords.
-Root, mysql, mariadb.sys and anonymous accounts are reserved.
+Application accounts to manage; mysql_native_password accounts require nonempty
+database passwords.
+Other authentication plugins use their native authentication strings. Root,
+mysql, mariadb.sys and anonymous accounts are reserved.
 
 Default:
 
@@ -278,8 +314,10 @@ restart it before database objects are managed.
   is stored or required.
 - All root accounts outside localhost and all anonymous accounts are removed.
   The test database and grants for test and test wildcard databases are removed.
-- Application accounts require nonempty passwords and cannot use reserved
-  administrative names. Protect passwords with Ansible Vault; mariadb_no_log
+- mysql_native_password application accounts require nonempty passwords. Other
+  authentication plugins must omit password and use their native authentication
+  strings as appropriate. Reserved administrative account names remain
+  prohibited. Protect authentication secrets with Ansible Vault; mariadb_no_log
   defaults to true.
 - TCP listens on 127.0.0.1 by default. Opening access on other addresses
   requires appropriate network and TLS controls.
@@ -289,6 +327,12 @@ restart it before database objects are managed.
 - Set mariadb_require_secure_transport to true to reject unencrypted TCP
   connections; Unix socket administration remains available. This setting
   requires MariaDB 10.5.2 or newer and mariadb_tls_enabled.
+- PAM with pam_use_cleartext_plugin sends the PAM password to the server; use
+  certificate-verified TLS and enforce secure transport. PAM policy and helper
+  permissions must already permit the MariaDB service to authenticate accounts.
+- Audit event selection and output are native server_audit options. Enable
+  server_audit_logging explicitly; audit logs can contain application query data
+  and should have appropriately restricted storage and retention.
 - Explicit state: absent removes the named database or account; database removal
   deletes its data.
 
@@ -297,7 +341,9 @@ restart it before database objects are managed.
 - Distribution defaults retain control of data, log, PID and socket paths.
   Sockets are /run/mysqld/mysqld.sock on Debian/Ubuntu,
   /var/lib/mysql/mysql.sock on AlmaLinux/Fedora, and /run/mysql/mysql.sock on
-  openSUSE.
+  openSUSE. Platform variables record the native data directory, including
+  /var/lib/mariadb on Ubuntu 26 and /var/lib/mysql on the other tested
+  platforms. Verification uses these values without relocating existing data.
 - The role does not replace the main distribution configuration file. Native
   mariadbd --defaults-file validation checks the candidate snippet before
   deployment; it does not validate interactions with other administrator-managed
@@ -320,6 +366,34 @@ restart it before database objects are managed.
 - User host, update_password and append_privs override their role-wide defaults
   per item. Privileges use the mariadb_user module string or dictionary syntax.
   Omitted privileges preserve existing grants.
+- mariadb_plugins entries require the plugin name and library basename. The role
+  uses plugin-load-add and FORCE to make enabled plugin initialization
+  mandatory. Options take native MariaDB names and scalar values; enabled
+  defaults to true.
+- Set enabled to false to write OFF and keep a plugin disabled across restarts,
+  including plugins loaded by distribution snippets or mysql.plugin. Removing an
+  entry only removes this role's configuration; external loading rules remain in
+  effect. Plugin packages are retained, and accounts referencing disabled
+  plugins are not migrated automatically.
+- Audit and PAM libraries are included in the base server package on
+  Debian/Ubuntu and openSUSE; Red Hat distributions use mariadb-pam for PAM.
+  GSSAPI uses mariadb-plugin-gssapi-server on Debian/Ubuntu and
+  mariadb-gssapi-server on Red Hat; openSUSE includes it in the server package.
+  An item's packages list overrides these defaults; unknown plugins default to
+  [].
+- GSSAPI requires an existing keytab readable by the MariaDB service and a
+  matching gssapi_principal_name. Client accounts use plugin_hash_string for
+  their Kerberos principal, including the realm. Realm configuration and client
+  tickets remain external.
+- PAM accounts use plugin_auth_string for the service name in /etc/pam.d; the
+  role does not create or replace that service. The openSUSE package only
+  accepts the service name mysql; provision /etc/pam.d/mysql there. Set
+  mariadb_user_plugin for a role-wide authentication policy or plugin on
+  individual accounts.
+- The upstream user module gives password precedence over plugin selection. The
+  role rejects password with other plugins and accepts at most one of password,
+  plugin_auth_string and plugin_hash_string to avoid unintended authentication
+  methods.
 - The former inert mariadb_role_enabled scaffold is removed: applying the role
   now establishes the running service.
 
@@ -376,6 +450,64 @@ mariadb_tls_ca_file: /etc/mariadb/tls/ca.crt
 mariadb_require_secure_transport: true
 ```
 
+### Audit database activity
+
+Send selected audit events to syslog using the distribution's logging service.
+
+```yaml
+---
+mariadb_plugins:
+  - name: server_audit
+    library: server_audit
+    options:
+      server_audit_logging: 'ON'
+      server_audit_output_type: SYSLOG
+      server_audit_events: CONNECT,QUERY_DDL,QUERY_DML
+```
+
+### GSSAPI and PAM application authentication
+
+Use an existing Kerberos keytab and PAM service with required TLS.
+
+```yaml
+---
+mariadb_tls_enabled: true
+mariadb_tls_cert_file: /etc/mariadb/tls/server.crt
+mariadb_tls_key_file: /etc/mariadb/tls/server.key
+mariadb_require_secure_transport: true
+mariadb_plugins:
+  - name: gssapi
+    library: auth_gssapi
+    options:
+      gssapi_keytab_path: /etc/mysql/mariadb.keytab
+      gssapi_principal_name: mariadb/db.example.com@EXAMPLE.COM
+  - name: pam
+    library: auth_pam
+    options:
+      pam_use_cleartext_plugin: 'ON'
+mariadb_users:
+  - name: kerberos_application
+    plugin: gssapi
+    plugin_hash_string: application@EXAMPLE.COM
+    priv: 'application.*:SELECT'
+  - name: pam_application
+    plugin: pam
+    plugin_auth_string: mysql
+    priv: 'application.*:SELECT'
+```
+
+### Disable a plugin
+
+Keep PAM disabled even when another configuration source loads its library.
+
+```yaml
+---
+mariadb_plugins:
+  - name: pam
+    library: auth_pam
+    enabled: false
+```
+
 ### Remove an obsolete account and database
 
 Explicit removal deletes the named database and its data.
@@ -392,6 +524,9 @@ mariadb_databases:
 
 ## References
 
+- [MariaDB Audit Plugin](https://mariadb.com/docs/server/reference/plugins/mariadb-audit-plugin)
+- [MariaDB GSSAPI authentication](https://mariadb.com/docs/server/reference/plugins/authentication-plugins/authentication-plugin-gssapi)
+- [MariaDB PAM authentication](https://mariadb.com/docs/server/reference/plugins/authentication-plugins/authentication-with-pluggable-authentication-modules-pam/authentication-plugin-pam)
 - [MariaDB TLS configuration](https://mariadb.com/docs/server/security/encryption/data-in-transit-encryption/securing-connections-for-client-and-server)
 - [Ansible MariaDB modules](https://docs.ansible.com/projects/ansible/latest/collections/ansible/mariadb/)
 - [MariaDB secure installation](https://mariadb.com/docs/server/clients-and-utilities/deployment-tools/mariadb-secure-installation)
@@ -406,4 +541,4 @@ mariadb_databases:
 This project is licensed under the MIT License.
 See [LICENSE](LICENSE) for the full license text.
 
-Copyright (c) 2020 Jonas Mauer.
+Copyright (c) 2020-2026 Jonas Mauer.

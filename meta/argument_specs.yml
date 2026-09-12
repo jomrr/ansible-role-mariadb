@@ -60,6 +60,45 @@ argument_specs:
         default: utf8mb4
         description:
           - Character set for new databases without an item override.
+      mariadb_plugins:
+        type: list
+        elements: dict
+        default: []
+        description:
+          - Server plugins loaded from distribution plugin directories on startup. Enabled
+            plugins must initialize successfully.
+          - Audit, GSSAPI and PAM use distribution package defaults; other plugins may supply
+            their packages explicitly.
+        options:
+          name:
+            type: str
+            required: true
+            description:
+              - Plugin name, for example server_audit, gssapi or pam.
+          library:
+            type: str
+            required: true
+            description:
+              - Plugin library basename, for example server_audit, auth_gssapi or auth_pam,
+                without a path or suffix.
+          enabled:
+            type: bool
+            default: true
+            description:
+              - Load the plugin with FORCE when true; explicitly disable it with OFF when
+                false.
+          packages:
+            type: list
+            elements: str
+            description:
+              - Override distribution packages for this plugin. Unknown plugins default
+                to no additional packages.
+          options:
+            type: dict
+            default: {}
+            description:
+              - Native plugin options written to the server configuration; use MariaDB option
+                names and scalar values.
       mariadb_database_collation:
         type: str
         default: utf8mb4_unicode_ci
@@ -98,6 +137,12 @@ argument_specs:
         default: localhost
         description:
           - Default host component of application accounts.
+      mariadb_user_plugin:
+        type: str
+        default: mysql_native_password
+        description:
+          - Authentication plugin for accounts without an item override. The default requires
+            a nonempty database password.
       mariadb_user_update_password:
         type: str
         default: always
@@ -116,8 +161,10 @@ argument_specs:
         type: list
         default: []
         description:
-          - Application accounts to manage; present accounts require nonempty passwords.
-            Root, mysql, mariadb.sys and anonymous accounts are reserved.
+          - Application accounts to manage; mysql_native_password accounts require nonempty
+            database passwords.
+          - Other authentication plugins use their native authentication strings. Root,
+            mysql, mariadb.sys and anonymous accounts are reserved.
         elements: dict
         options:
           name:
@@ -132,8 +179,25 @@ argument_specs:
           password:
             type: str
             description:
-              - Plaintext password, required and nonempty for present accounts. Store with
-                Ansible Vault.
+              - Plaintext password, required and nonempty for present mysql_native_password
+                accounts. Store with Ansible Vault.
+              - Omit for other authentication plugins; password takes precedence over plugin
+                selection in the upstream module.
+          plugin:
+            type: str
+            description:
+              - Authentication plugin; defaults to mariadb_user_plugin. Examples are mysql_native_password,
+                gssapi and pam.
+          plugin_auth_string:
+            type: str
+            description:
+              - Native authentication string; for PAM, the service name in /etc/pam.d. Mutually
+                exclusive with password and plugin_hash_string.
+          plugin_hash_string:
+            type: str
+            description:
+              - Literal authentication string passed with AS; for GSSAPI, the client principal
+                including its realm. Mutually exclusive with password and plugin_auth_string.
           priv:
             type: raw
             description:

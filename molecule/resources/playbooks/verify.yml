@@ -6,27 +6,40 @@
   hosts: all
   gather_facts: true
   tasks:
+    - name: MARIADB | Load distribution settings for verification
+      ansible.builtin.include_vars: "{{ lookup('ansible.builtin.first_found', __mariadb_platform_files) }}"
+      vars:
+        __mariadb_platform_files:
+          files:
+            - "{{ ansible_facts.distribution }}-{{ ansible_facts.distribution_major_version }}.yml"
+            - "{{ ansible_facts.distribution }}.yml"
+            - "{{ ansible_facts.os_family }}.yml"
+          paths:
+            - "{{ lookup('ansible.builtin.env', 'MOLECULE_PROJECT_DIRECTORY') }}/vars"
+
     - name: MARIADB | Read account and database state through local root authentication
       become: true
       become_user: root
       ansible.mariadb.mariadb_query:
         login_user: root
         config_file: ''
-        login_unix_socket: "{{ __mariadb_verify_sockets[ansible_facts.os_family] }}"
+        login_unix_socket: "{{ __mariadb_socket }}"
         query:
           - SELECT User, Host, plugin FROM mysql.user WHERE User IN ('', 'root', 'obsolete')
           - SELECT COUNT(*) AS remaining FROM mysql.db WHERE Db IN ('test', 'test\\_%')
           - SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME IN ('test', 'obsolete')
           - SELECT JSON_CONTAINS_PATH(Priv, 'one', '$.auth_or') AS alternatives FROM mysql.global_priv WHERE User = 'root' AND Host = 'localhost'
-          - SELECT @@port AS port, @@bind_address AS bind_address
+          - SELECT @@port AS port, @@bind_address AS bind_address, @@datadir AS datadir
           - >-
             SELECT DEFAULT_CHARACTER_SET_NAME AS encoding, DEFAULT_COLLATION_NAME AS collation
             FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = 'application'
-      vars:
-        __mariadb_verify_sockets:
-          Debian: /run/mysqld/mysqld.sock
-          RedHat: /var/lib/mysql/mysql.sock
-          Suse: /run/mysql/mysql.sock
+          - >-
+            SELECT COUNT(*) AS active FROM information_schema.PLUGINS
+            WHERE LOWER(PLUGIN_NAME) IN ('server_audit', 'gssapi', 'pam') AND PLUGIN_STATUS = 'ACTIVE'
+          - SELECT @@gssapi_keytab_path AS keytab, @@gssapi_principal_name AS principal
+          - >-
+            SELECT User, plugin, authentication_string FROM mysql.user
+            WHERE User IN ('kerberos_application', 'pam_application') ORDER BY User
       register: __mariadb_state
 
     - name: MARIADB | Verify secure installation and configured database defaults
@@ -38,8 +51,16 @@
           - __mariadb_state.query_result[3][0].alternatives == 0
           - __mariadb_state.query_result[4][0].port == 3307
           - __mariadb_state.query_result[4][0].bind_address == '127.0.0.1'
+          - __mariadb_state.query_result[4][0].datadir | regex_replace('/$', '') == __mariadb_datadir
           - __mariadb_state.query_result[5][0].encoding == 'utf8mb4'
           - __mariadb_state.query_result[5][0].collation == 'utf8mb4_unicode_ci'
+          - __mariadb_state.query_result[6][0].active == 3
+          - __mariadb_state.query_result[7][0].keytab == '/etc/mariadb-auth/server.keytab'
+          - __mariadb_state.query_result[7][0].principal == 'mariadb/localhost@MOLECULE.TEST'
+          - >-
+            __mariadb_state.query_result[8] == [
+              {'User': 'kerberos_application', 'plugin': 'gssapi', 'authentication_string': 'application@MOLECULE.TEST'},
+              {'User': 'pam_application', 'plugin': 'pam', 'authentication_string': 'mysql'}]
         quiet: true
 
     - name: MARIADB | Exercise application login and write privileges over TCP
@@ -57,6 +78,7 @@
           - INSERT INTO role_probe VALUES (42) ON DUPLICATE KEY UPDATE id = 42
           - SELECT id FROM role_probe
           - SHOW SESSION STATUS LIKE 'Ssl_cipher'
+          - SELECT 'mariadb-audit-probe' AS audit_marker
       register: __mariadb_application
       no_log: true
 
@@ -87,6 +109,40 @@
           - __mariadb_reader.query_result[0] == [{'id':42}]
         quiet: true
 
+    - name: MARIADB | Read the audit trail containing the application query
+      become: true
+      become_user: root
+      ansible.builtin.slurp:
+        src: "{{ __mariadb_datadir }}/molecule-audit.log"
+      register: __mariadb_audit
+      no_log: true
+
+    - name: MARIADB | Verify application activity reached the audit log
+      ansible.builtin.assert:
+        that:
+          - "'mariadb-audit-probe' in (__mariadb_audit.content | b64decode)"
+        quiet: true
+
+    - name: MARIADB | Authenticate through the configured PAM service over TLS
+      ansible.mariadb.mariadb_query:
+        login_user: pam_application
+        login_password: molecule-pam-password
+        login_host: 127.0.0.1
+        login_port: 3307
+        ca_cert: /etc/mariadb-tls/server.crt
+        check_hostname: true
+        config_file: ''
+        login_db: application
+        query: SELECT id FROM role_probe
+      register: __mariadb_pam
+      no_log: true
+
+    - name: MARIADB | Verify PAM-authenticated access to application data
+      ansible.builtin.assert:
+        that:
+          - __mariadb_pam.query_result[0] == [{'id':42}]
+        quiet: true
+
     - name: MARIADB | Reject application access without TLS
       ansible.builtin.command:
         argv:
@@ -106,11 +162,15 @@
         ('ERROR 1045' not in __mariadb_plaintext.stderr and 'ERROR 3159' not in __mariadb_plaintext.stderr)
       no_log: true
 
-    - name: MARIADB | Remove managed TLS settings and change the port and password
+    - name: MARIADB | Disable plugins and managed TLS settings and change the port and password
       ansible.builtin.include_role:
         name: "{{ lookup('ansible.builtin.env', 'MOLECULE_PROJECT_DIRECTORY') }}"
       vars:
         mariadb_port: 3308
+        mariadb_plugins:
+          - {name: server_audit, library: server_audit, enabled: false}
+          - {name: gssapi, library: auth_gssapi, enabled: false}
+          - {name: pam, library: auth_pam, enabled: false}
         mariadb_tls_enabled: false
         mariadb_require_secure_transport: false
         mariadb_users:
@@ -141,4 +201,22 @@
       ansible.builtin.assert:
         that:
           - __mariadb_rotated.stdout == '42'
+        quiet: true
+
+    - name: MARIADB | Read plugin state after the restart
+      become: true
+      become_user: root
+      ansible.mariadb.mariadb_query:
+        login_user: root
+        config_file: ''
+        login_unix_socket: "{{ __mariadb_socket }}"
+        query: >-
+          SELECT COUNT(*) AS active FROM information_schema.PLUGINS
+          WHERE LOWER(PLUGIN_NAME) IN ('server_audit', 'gssapi', 'pam') AND PLUGIN_STATUS = 'ACTIVE'
+      register: __mariadb_disabled_plugins
+
+    - name: MARIADB | Verify all explicitly disabled plugins are inactive
+      ansible.builtin.assert:
+        that:
+          - __mariadb_disabled_plugins.query_result[0][0].active == 0
         quiet: true

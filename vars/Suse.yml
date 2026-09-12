@@ -7,5 +7,11 @@ __mariadb_packages:
   - mariadb-client
   - python3-PyMySQL
 __mariadb_config_file: /etc/my.cnf.d/99-ansible.cnf
+__mariadb_datadir: /var/lib/mysql
 __mariadb_socket: /run/mysql/mysql.sock
 __mariadb_validate_config: /usr/sbin/mariadbd --defaults-file=%s --verbose --help
+
+__mariadb_plugin_packages:
+  server_audit: []
+  gssapi: []
+  pam: []

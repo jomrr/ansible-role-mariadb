@@ -2,11 +2,15 @@
 # role: mariadb
 # file: tasks/configure.yml
 
-- name: MARIADB | Install server and module dependencies
+- name: MARIADB | Install server, plugin and module dependencies
   become: true
   become_user: root
   ansible.builtin.package:
-    name: "{{ __mariadb_packages }}"
+    name: >-
+      {{ __mariadb_packages
+         + (mariadb_plugins | selectattr('packages', 'defined') | map(attribute='packages') | flatten)
+         + (mariadb_plugins | rejectattr('packages', 'defined') | map(attribute='name')
+            | select('in', __mariadb_plugin_packages) | map('extract', __mariadb_plugin_packages) | flatten) }}
     state: present
 
 - name: MARIADB | Configure the server

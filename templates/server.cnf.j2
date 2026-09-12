@@ -15,3 +15,10 @@ ssl-ca = {{ mariadb_tls_ca_file | to_json }}
 {% if mariadb_require_secure_transport %}
 require-secure-transport = ON
 {% endif %}
+{% for __mariadb_plugin in mariadb_plugins %}
+plugin-load-add = {{ (__mariadb_plugin.name ~ '=' ~ __mariadb_plugin.library) | to_json }}
+{{ __mariadb_plugin.name }} = {{ (__mariadb_plugin.enabled | default(true)) | ternary('FORCE', 'OFF') }}
+{% for __mariadb_option in (__mariadb_plugin.options | default({})).items() %}
+{{ __mariadb_option[0] }} = {{ __mariadb_option[1] | to_json }}
+{% endfor %}
+{% endfor %}

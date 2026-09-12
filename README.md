@@ -19,6 +19,8 @@ declared application databases and accounts.
 
 - MariaDB server, client and PyMySQL packages; enabled and running service.
 - A validated server snippet with bind address and TCP port.
+- Optional TLS configuration using existing certificates and an optional
+  encrypted TCP transport requirement.
 - Local root socket authentication, anonymous and remote root account removal,
   test database and test grant removal.
 - Application database and account present/absent states, passwords and
@@ -46,6 +48,8 @@ declared application databases and accounts.
 ```yaml
 collections:
   - name: ansible.posix
+  - name: community.crypto
+    version: '>=3.0.0'
   - name: community.general
     version: '>=12.0.0'
   - name: ansible.mariadb
@@ -88,6 +92,60 @@ Default:
 
 ```yaml
 mariadb_port: 3306
+```
+
+### `mariadb_tls_enabled`
+
+Type: `bool`. Required: `false`.
+
+Configure TLS with existing certificate files. False leaves distribution TLS
+settings in effect.
+
+Default:
+
+```yaml
+mariadb_tls_enabled: false
+```
+
+### `mariadb_tls_cert_file`
+
+Type: `path`. Required: `false`.
+
+Absolute path to the existing PEM server certificate and intermediate chain;
+required when TLS is enabled.
+
+### `mariadb_tls_key_file`
+
+Type: `path`. Required: `false`.
+
+Absolute path to the existing unencrypted PEM private key; required when TLS is
+enabled and readable by MariaDB.
+
+### `mariadb_tls_ca_file`
+
+Type: `path`. Required: `false`.
+
+Optional absolute path to an existing PEM CA bundle. Empty leaves the CA setting
+unconfigured.
+
+Default:
+
+```yaml
+mariadb_tls_ca_file: ''
+```
+
+### `mariadb_require_secure_transport`
+
+Type: `bool`. Required: `false`.
+
+Require TLS for TCP connections while allowing local Unix sockets. Requires
+mariadb_tls_enabled and MariaDB 10.5.2 or newer. False leaves the distribution
+transport policy in effect.
+
+Default:
+
+```yaml
+mariadb_require_secure_transport: false
 ```
 
 ### `mariadb_database_encoding`
@@ -225,6 +283,12 @@ restart it before database objects are managed.
   defaults to true.
 - TCP listens on 127.0.0.1 by default. Opening access on other addresses
   requires appropriate network and TLS controls.
+- Enable mariadb_tls_enabled with mariadb_tls_cert_file and mariadb_tls_key_file
+  to use existing PEM files. An optional mariadb_tls_ca_file supplies a CA
+  bundle. Clients must verify the server certificate and hostname.
+- Set mariadb_require_secure_transport to true to reject unencrypted TCP
+  connections; Unix socket administration remains available. This setting
+  requires MariaDB 10.5.2 or newer and mariadb_tls_enabled.
 - Explicit state: absent removes the named database or account; database removal
   deletes its data.
 
@@ -240,6 +304,19 @@ restart it before database objects are managed.
   snippets.
 - Database encoding and collation are creation defaults; existing databases are
   not converted.
+- TLS paths must be absolute and readable by the MariaDB service, including
+  directory permissions and any SELinux or AppArmor policy. Provision
+  certificates and an unencrypted private key before applying the role; restrict
+  key access to root and the MariaDB service account.
+- Disabling mariadb_tls_enabled removes the role's TLS options and restores
+  distribution settings; newer MariaDB versions may still offer automatic TLS.
+  Disabling mariadb_require_secure_transport likewise restores the distribution
+  policy.
+- Certificate replacement at an unchanged path is managed externally; restart
+  MariaDB or issue FLUSH SSL after renewal. Changes to configured paths notify
+  the role's restart handler.
+- The community.crypto collection is used only to generate disposable Molecule
+  test certificates.
 - User host, update_password and append_privs override their role-wide defaults
   per item. Privileges use the mariadb_user module string or dictionary syntax.
   Omitted privileges preserve existing grants.
@@ -286,6 +363,19 @@ mariadb_users:
     priv: 'application.*:ALL'
 ```
 
+### Require encrypted TCP connections
+
+Use certificates provisioned by an external PKI. Requires MariaDB 10.5.2 or newer.
+
+```yaml
+---
+mariadb_tls_enabled: true
+mariadb_tls_cert_file: /etc/mariadb/tls/server.crt
+mariadb_tls_key_file: /etc/mariadb/tls/server.key
+mariadb_tls_ca_file: /etc/mariadb/tls/ca.crt
+mariadb_require_secure_transport: true
+```
+
 ### Remove an obsolete account and database
 
 Explicit removal deletes the named database and its data.
@@ -302,6 +392,7 @@ mariadb_databases:
 
 ## References
 
+- [MariaDB TLS configuration](https://mariadb.com/docs/server/security/encryption/data-in-transit-encryption/securing-connections-for-client-and-server)
 - [Ansible MariaDB modules](https://docs.ansible.com/projects/ansible/latest/collections/ansible/mariadb/)
 - [MariaDB secure installation](https://mariadb.com/docs/server/clients-and-utilities/deployment-tools/mariadb-secure-installation)
 - [MariaDB authentication](https://mariadb.com/docs/server/security/user-account-management/authentication-from-mariadb-10-4)

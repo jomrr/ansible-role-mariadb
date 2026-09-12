@@ -11,11 +11,29 @@ mariadb_bind_address: 127.0.0.1
 # TCP port for MariaDB clients.
 mariadb_port: 3306
 
+# Configure existing TLS credentials; false leaves distribution TLS settings in effect.
+mariadb_tls_enabled: false
+
+# Absolute PEM server certificate and intermediate chain path, required with TLS enabled.
+# mariadb_tls_cert_file: /etc/mariadb/tls/server.crt
+
+# Absolute unencrypted PEM private key path, required with TLS enabled and readable by MariaDB.
+# mariadb_tls_key_file: /etc/mariadb/tls/server.key
+
+# Optional existing PEM CA bundle; empty leaves the CA setting unconfigured.
+mariadb_tls_ca_file: ''
+# mariadb_tls_ca_file: /etc/mariadb/tls/ca.crt
+
+# Require TLS on TCP while allowing Unix sockets; needs TLS enabled and MariaDB 10.5.2+.
+# False leaves the distribution transport policy in effect.
+mariadb_require_secure_transport: false
+
 # Character set used when creating databases without an item override.
 mariadb_database_encoding: utf8mb4
 
 # Collation used when creating databases without an item override.
 mariadb_database_collation: utf8mb4_unicode_ci
+# mariadb_database_collation: utf8mb4_german2_ci
 
 # Databases managed with individual present or absent states.
 mariadb_databases: []

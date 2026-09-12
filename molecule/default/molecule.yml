@@ -30,6 +30,11 @@ provisioner:
     group_vars:
       all:
         mariadb_port: 3307
+        mariadb_tls_enabled: true
+        mariadb_tls_cert_file: "/etc/mariadb-tls/server.crt"
+        mariadb_tls_key_file: "/etc/mariadb-tls/server.key"
+        mariadb_tls_ca_file: "/etc/mariadb-tls/server.crt"
+        mariadb_require_secure_transport: true
         mariadb_databases:
           - name: "application"
           - name: "obsolete"

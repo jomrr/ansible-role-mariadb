@@ -4,3 +4,14 @@
 [mysqld]
 bind-address = {{ mariadb_bind_address }}
 port = {{ mariadb_port }}
+{% if mariadb_tls_enabled %}
+ssl = ON
+ssl-cert = {{ mariadb_tls_cert_file | to_json }}
+ssl-key = {{ mariadb_tls_key_file | to_json }}
+{% if mariadb_tls_ca_file | length > 0 %}
+ssl-ca = {{ mariadb_tls_ca_file | to_json }}
+{% endif %}
+{% endif %}
+{% if mariadb_require_secure_transport %}
+require-secure-transport = ON
+{% endif %}

@@ -2,6 +2,22 @@
 # role: mariadb
 # file: tasks/assert.yml
 
+- name: MARIADB | Require TLS configuration for encrypted transport enforcement
+  ansible.builtin.assert:
+    that:
+      - not mariadb_require_secure_transport or mariadb_tls_enabled
+    fail_msg: mariadb_require_secure_transport requires mariadb_tls_enabled.
+    quiet: true
+
+- name: MARIADB | Require certificate and key paths when configuring TLS
+  ansible.builtin.assert:
+    that:
+      - mariadb_tls_cert_file is defined and mariadb_tls_cert_file | length > 0
+      - mariadb_tls_key_file is defined and mariadb_tls_key_file | length > 0
+    fail_msg: TLS requires mariadb_tls_cert_file and mariadb_tls_key_file pointing to existing PEM files.
+    quiet: true
+  when: mariadb_tls_enabled
+
 - name: MARIADB | Reserve system and test databases
   ansible.builtin.assert:
     that:

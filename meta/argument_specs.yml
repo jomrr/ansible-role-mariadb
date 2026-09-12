@@ -26,6 +26,35 @@ argument_specs:
         default: 3306
         description:
           - TCP port for MariaDB clients.
+      mariadb_tls_enabled:
+        type: bool
+        default: false
+        description:
+          - Configure TLS with existing certificate files. False leaves distribution TLS
+            settings in effect.
+      mariadb_tls_cert_file:
+        type: path
+        description:
+          - Absolute path to the existing PEM server certificate and intermediate chain;
+            required when TLS is enabled.
+      mariadb_tls_key_file:
+        type: path
+        description:
+          - Absolute path to the existing unencrypted PEM private key; required when TLS
+            is enabled and readable by MariaDB.
+      mariadb_tls_ca_file:
+        type: path
+        default: ''
+        description:
+          - Optional absolute path to an existing PEM CA bundle. Empty leaves the CA setting
+            unconfigured.
+      mariadb_require_secure_transport:
+        type: bool
+        default: false
+        description:
+          - Require TLS for TCP connections while allowing local Unix sockets. Requires
+            mariadb_tls_enabled and MariaDB 10.5.2 or newer. False leaves the distribution
+            transport policy in effect.
       mariadb_database_encoding:
         type: str
         default: utf8mb4

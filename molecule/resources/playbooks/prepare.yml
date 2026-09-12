@@ -2,6 +2,42 @@
 # role: mariadb
 # file: molecule/resources/playbooks/prepare.yml
 
+- name: MARIADB | Generate disposable TLS fixtures on the controller
+  hosts: localhost
+  gather_facts: false
+  vars:
+    __mariadb_tls_fixture_dir: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/tls"
+  tasks:
+    - name: MARIADB | Create the controller fixture directory
+      ansible.builtin.file:
+        path: "{{ __mariadb_tls_fixture_dir }}"
+        state: directory
+        mode: '0700'
+
+    - name: MARIADB | Generate the disposable server key
+      community.crypto.openssl_privatekey:
+        path: "{{ __mariadb_tls_fixture_dir }}/server.key"
+        type: RSA
+        size: 2048
+        mode: '0600'
+
+    - name: MARIADB | Create the server certificate request
+      community.crypto.openssl_csr:
+        path: "{{ __mariadb_tls_fixture_dir }}/server.csr"
+        privatekey_path: "{{ __mariadb_tls_fixture_dir }}/server.key"
+        common_name: localhost
+        subject_alt_name: ['DNS:localhost', 'IP:127.0.0.1']
+        mode: '0600'
+
+    - name: MARIADB | Sign the disposable server certificate
+      community.crypto.x509_certificate:
+        path: "{{ __mariadb_tls_fixture_dir }}/server.crt"
+        privatekey_path: "{{ __mariadb_tls_fixture_dir }}/server.key"
+        csr_path: "{{ __mariadb_tls_fixture_dir }}/server.csr"
+        provider: selfsigned
+        selfsigned_not_after: '+1d'
+        mode: '0644'
+
 - name: MARIADB | Prepare installation and insecure legacy fixtures
   hosts: all
   gather_facts: true
@@ -18,6 +54,8 @@
         name: "{{ lookup('ansible.builtin.env', 'MOLECULE_PROJECT_DIRECTORY') }}"
         public: true
       vars:
+        mariadb_tls_enabled: false
+        mariadb_require_secure_transport: false
         mariadb_databases: []
         mariadb_users: []
 
@@ -74,4 +112,35 @@
         query: >-
           ALTER USER 'root'@'localhost' IDENTIFIED VIA unix_socket
           OR mysql_native_password USING PASSWORD('molecule-legacy-root')
+      no_log: true
+
+    - name: MARIADB | Create the server fixture directory
+      become: true
+      become_user: root
+      ansible.builtin.file:
+        path: /etc/mariadb-tls
+        state: directory
+        owner: root
+        group: mysql
+        mode: '0755'
+
+    - name: MARIADB | Install the fixture certificate
+      become: true
+      become_user: root
+      ansible.builtin.copy:
+        src: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/tls/server.crt"
+        dest: /etc/mariadb-tls/server.crt
+        owner: root
+        group: mysql
+        mode: '0644'
+
+    - name: MARIADB | Install the fixture private key
+      become: true
+      become_user: root
+      ansible.builtin.copy:
+        src: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/tls/server.key"
+        dest: /etc/mariadb-tls/server.key
+        owner: root
+        group: mysql
+        mode: '0640'
       no_log: true

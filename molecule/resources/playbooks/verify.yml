@@ -48,12 +48,15 @@
         login_password: molecule-application-password
         login_host: 127.0.0.1
         login_port: 3307
+        ca_cert: /etc/mariadb-tls/server.crt
+        check_hostname: true
         config_file: ''
         login_db: application
         query:
           - CREATE TABLE IF NOT EXISTS role_probe (id INTEGER PRIMARY KEY)
           - INSERT INTO role_probe VALUES (42) ON DUPLICATE KEY UPDATE id = 42
           - SELECT id FROM role_probe
+          - SHOW SESSION STATUS LIKE 'Ssl_cipher'
       register: __mariadb_application
       no_log: true
 
@@ -61,6 +64,7 @@
       ansible.builtin.assert:
         that:
           - __mariadb_application.query_result[2] == [{'id':42}]
+          - __mariadb_application.query_result[3][0].Value | length > 0
         quiet: true
 
     - name: MARIADB | Read application data with a restricted account
@@ -69,6 +73,8 @@
         login_password: molecule-reader-password
         login_host: 127.0.0.1
         login_port: 3307
+        ca_cert: /etc/mariadb-tls/server.crt
+        check_hostname: true
         config_file: ''
         login_db: application
         query: SELECT id FROM role_probe
@@ -81,30 +87,58 @@
           - __mariadb_reader.query_result[0] == [{'id':42}]
         quiet: true
 
-    - name: MARIADB | Change the running server port and rotate an account password
+    - name: MARIADB | Reject application access without TLS
+      ansible.builtin.command:
+        argv:
+          - mariadb
+          - --no-defaults
+          - --host=127.0.0.1
+          - --port=3307
+          - --user=application
+          - --skip-ssl
+          - --execute=SELECT 1
+      environment:
+        MYSQL_PWD: molecule-application-password
+      register: __mariadb_plaintext
+      changed_when: false
+      failed_when: >-
+        __mariadb_plaintext.rc == 0 or
+        ('ERROR 1045' not in __mariadb_plaintext.stderr and 'ERROR 3159' not in __mariadb_plaintext.stderr)
+      no_log: true
+
+    - name: MARIADB | Remove managed TLS settings and change the port and password
       ansible.builtin.include_role:
         name: "{{ lookup('ansible.builtin.env', 'MOLECULE_PROJECT_DIRECTORY') }}"
       vars:
         mariadb_port: 3308
+        mariadb_tls_enabled: false
+        mariadb_require_secure_transport: false
         mariadb_users:
           - name: application
             password: molecule-rotated-password
             priv: 'application.*:ALL'
 
-    - name: MARIADB | Verify the changed port and password preserve application data
-      ansible.mariadb.mariadb_query:
-        login_user: application
-        login_password: molecule-rotated-password
-        login_host: 127.0.0.1
-        login_port: 3308
-        config_file: ''
-        login_db: application
-        query: SELECT id FROM role_probe
+    - name: MARIADB | Verify plaintext access after removing the transport requirement
+      ansible.builtin.command:
+        argv:
+          - mariadb
+          - --no-defaults
+          - --host=127.0.0.1
+          - --port=3308
+          - --user=application
+          - --skip-ssl
+          - --database=application
+          - --batch
+          - --skip-column-names
+          - --execute=SELECT id FROM role_probe
+      environment:
+        MYSQL_PWD: molecule-rotated-password
       register: __mariadb_rotated
+      changed_when: false
       no_log: true
 
     - name: MARIADB | Verify data survived the configuration change
       ansible.builtin.assert:
         that:
-          - __mariadb_rotated.query_result[0] == [{'id':42}]
+          - __mariadb_rotated.stdout == '42'
         quiet: true

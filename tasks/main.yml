@@ -13,7 +13,7 @@
       paths:
         - "{{ role_path }}/vars"
 
-- name: MARIADB | Validate application objects
+- name: MARIADB | Validate TLS policy and application objects
   ansible.builtin.import_tasks: assert.yml
 
 - name: MARIADB | Install and configure the server
